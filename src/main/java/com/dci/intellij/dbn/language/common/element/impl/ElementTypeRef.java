@@ -1,0 +1,109 @@
+package com.dci.intellij.dbn.language.common.element.impl;
+
+import com.dci.intellij.dbn.common.Chained;
+import com.dci.intellij.dbn.language.common.element.lookup.ElementTypeLookupCache;
+import com.dci.intellij.dbn.language.common.element.parser.Branch;
+import com.dci.intellij.dbn.language.common.element.parser.BranchCheck;
+import com.dci.intellij.dbn.language.common.element.parser.ElementTypeParser;
+
+import java.util.Set;
+
+public class ElementTypeRef extends Chained<ElementTypeRef> {
+    public final ElementTypeBase parentElementType;
+    public final ElementTypeBase elementType;
+    public final boolean optional;
+    public final double version;
+    private Set<BranchCheck> branchChecks;
+
+    public ElementTypeRef(ElementTypeRef previous, ElementTypeBase parentElementType, ElementTypeBase elementType, boolean optional, double version, Set<BranchCheck> branchChecks) {
+        super(previous);
+        this.parentElementType = parentElementType;
+        this.elementType = elementType;
+        this.optional = optional;
+        this.version = version;
+        this.branchChecks = branchChecks;
+    }
+
+    public boolean check(Set<Branch> branches, double currentVersion) {
+        if (version > currentVersion) {
+            return false;
+        }
+
+        if (branches != null && !branches.isEmpty() && branchChecks != null) {
+            boolean finalCheckValue = true;
+            for (Branch branch : branches) {
+                for (BranchCheck branchCheck : branchChecks) {
+                    boolean checkValue = branchCheck.check(branch, currentVersion);
+                    if (branchCheck.getType() == BranchCheck.Type.FORBIDDEN) {
+                        if (!checkValue) return false;
+                    } else if (branchCheck.getType() == BranchCheck.Type.ALLOWED) {
+                        finalCheckValue = finalCheckValue || checkValue;
+                    }
+                }
+            }
+            return finalCheckValue;
+        }
+
+
+/*
+        if (branches != null) {
+            Set<Branch> checkedBranches = getParentElementType().getCheckedBranches();
+            if (checkedBranches != null) {
+                if (supportedBranches != null) {
+                    for (Branch branch : branches) {
+                        if (checkedBranches.contains(branch)) {
+                            for (Branch supportedBranch : supportedBranches) {
+                                if (supportedBranch.equals(branch) && currentVersion >= supportedBranch.getVersion()) {
+                                    return true;
+                                }
+                            }
+                            return false;
+                        }
+                    }
+                } else {
+                    return false;
+                }
+            }
+        }
+*/
+
+        return true;
+    }
+
+    boolean isOptionalToHere() {
+        if (getIndex() == 0) return false;
+
+        ElementTypeRef previous = getPrevious();
+        while (previous != null) {
+            if (!previous.optional) {
+                return false;
+            }
+            previous = previous.getPrevious();
+        }
+        return true;
+    }
+
+    public boolean isOptionalFromHere() {
+        ElementTypeRef next = getNext();
+        while (next != null) {
+            if (!next.optional) {
+                return false;
+            }
+            next = next.getNext();
+        }
+        return true;
+    }
+
+    public ElementTypeLookupCache getLookupCache() {
+        return elementType.lookupCache;
+    }
+
+    public ElementTypeParser getParser() {
+        return elementType.parser;
+    }
+
+    @Override
+    public String toString() {
+        return elementType.toString();
+    }
+}
